@@ -1,0 +1,906 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>VarPad — One tweak. Every snippet.</title>
+<style>
+  /* Colour palettes. Each sets every token, so palette previews can scope one with data-palette. */
+  :root,[data-palette="day"]{
+    color-scheme:light;
+    --bg:#f4f6f9; --panel:#fff; --ink:#202631; --muted:#687383; --line:#e1e6ed; --line-strong:#aab5c5; --hover:#fafbfc;
+    --accent:#315fce; --accent-hover:#264fae; --accent-soft:#edf2ff; --accent-line:#dce5ff; --accent-ink:#234cae; --on-accent:#fff; --focus:#315fce35;
+    --highlight:#2bc23f; --danger:#b42318; --danger-soft:#fff0ef; --code:#f5f7fa; --shadow:0 2px 10px #1822300a; --shadow-lg:0 6px 24px #1822301f;
+  }
+  [data-palette="midnight"]{
+    color-scheme:dark;
+    --bg:#0f141b; --panel:#171d26; --ink:#e6ebf2; --muted:#8b97a8; --line:#273141; --line-strong:#3a4659; --hover:#1d2430;
+    --accent:#5b8def; --accent-hover:#4a7be0; --accent-soft:#1c2a45; --accent-line:#2a3d63; --accent-ink:#9dbcff; --on-accent:#fff; --focus:#5b8def55;
+    --highlight:#3fdc5a; --danger:#ff6b5e; --danger-soft:#3a1d1d; --code:#11171f; --shadow:0 2px 10px #0006; --shadow-lg:0 6px 24px #0009;
+  }
+  [data-palette="forest"]{
+    color-scheme:light;
+    --bg:#f2f5f1; --panel:#fff; --ink:#1f2a22; --muted:#66756a; --line:#dde5dc; --line-strong:#a9b8a8; --hover:#f8faf7;
+    --accent:#2f7d4f; --accent-hover:#256640; --accent-soft:#e8f3ec; --accent-line:#cfe5d6; --accent-ink:#22613c; --on-accent:#fff; --focus:#2f7d4f35;
+    --highlight:#e8890c; --danger:#b42318; --danger-soft:#fff0ef; --code:#f4f7f3; --shadow:0 2px 10px #1822300a; --shadow-lg:0 6px 24px #1822301f;
+  }
+  *{box-sizing:border-box}
+  [hidden]{display:none!important}
+  body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.45 system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+  button,input,textarea{font:inherit}
+  button{border:1px solid var(--line);background:var(--panel);color:var(--ink);border-radius:8px;padding:8px 11px;cursor:pointer}
+  button:hover{border-color:var(--line-strong);background:var(--hover)}
+  button:focus-visible,input:focus-visible,textarea:focus-visible{outline:3px solid var(--focus);outline-offset:1px}
+  .primary{background:var(--accent);border-color:var(--accent);color:var(--on-accent);font-weight:650}
+  .primary:hover{background:var(--accent-hover);border-color:var(--accent-hover)}
+  .small{padding:5px 8px;font-size:12px}
+  .icon-btn{width:29px;height:29px;padding:0;display:inline-grid;place-items:center;font-size:16px;flex:0 0 auto}
+  .ico{width:1.1em;height:1.1em;vertical-align:-.2em;flex:none}
+  button:not(.icon-btn) .ico{margin-right:5px}
+  .delete-variable:hover,.delete-snippet:hover{color:var(--danger)}
+  .app-header{padding:19px 25px 16px;background:var(--panel);border-bottom:1px solid var(--line)}
+  .brand{max-width:1500px;margin:auto}
+  h1{font-size:25px;letter-spacing:-.65px;margin:0 0 1px}
+  .tagline{font-size:16px;font-weight:650;color:var(--highlight);margin:0 0 3px}
+  .description{color:var(--muted);margin:0;font-size:13px}
+  .zen-btn{font-size:18px;color:var(--accent);border-color:transparent;background:transparent}
+  /* Ensō: uneven border widths taper the stroke, heaviest at the lower right once rotated; the conic mask cuts the gap between twelve and one o'clock and fades the tail into it. */
+  .ico-enso{display:inline-block;width:1.2em;height:1.2em;border-radius:50%;border:solid currentColor;border-width:.12em .17em .11em .045em;transform:rotate(30deg);-webkit-mask:conic-gradient(from -35deg,transparent 0 45deg,#000 48deg 290deg,#0009 330deg,transparent 360deg);mask:conic-gradient(from -35deg,transparent 0 45deg,#000 48deg 290deg,#0009 330deg,transparent 360deg)}
+  .zen-btn:hover,.zen-btn[aria-pressed="true"]{border-color:var(--line);background:var(--accent-soft)}
+  /* Zen mode: only workspace switching, variable values, and snippet output remain. */
+  .zen .app-header{display:none}
+  .zen .side-head,.zen .drag-handle,.zen .workspace-more,.zen .delete-workspace,.zen #renameWorkspace,.zen .section-head,.zen .delete-variable,.zen .var-card .lock-btn,.zen .snippet-head,.zen .tpl-wrap,.zen .snippet-label-input,.zen .label-btn{display:none}
+  .zen .var-card{grid-template-columns:minmax(0,2fr) auto minmax(0,3fr)}
+  .zen .var-name:disabled{background:transparent;border-color:transparent}
+  .zen .snippet{grid-template-columns:minmax(0,1fr)}
+  .zen .snippet-body{gap:0}
+  .layout{max-width:1500px;margin:0 auto;padding:20px 20px 45px;display:grid;grid-template-columns:260px minmax(0,1fr);gap:20px;align-items:start}
+  .side-col{position:sticky;top:16px;min-width:0}
+  /* Same height as the workspace toolbar so the sidebar and the Variables section start level. */
+  .zen-row{height:34px;margin:0 0 13px;display:flex;align-items:center}
+  .sidebar{background:var(--panel);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow);overflow:hidden}
+  .side-head{display:flex;align-items:center;justify-content:space-between;min-height:52px;padding:12px 12px 10px;border-bottom:1px solid var(--line)}
+  .side-actions{display:flex;align-items:center;gap:4px}
+  .side-title{display:flex;align-items:center;gap:6px;min-width:0}
+  .side-head h2{font-size:13px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin:0}
+  .workspace-list{padding:6px;display:grid;gap:3px;max-height:calc(100vh - 180px);overflow:auto}
+  .workspace-row{display:flex;align-items:center;gap:2px;padding:0 4px 0 6px;border:1px solid transparent;border-radius:8px;min-width:0}
+  .workspace-row:hover{background:var(--hover)}
+  .workspace-row.active{background:var(--accent-soft);border-color:var(--accent-line)}
+  .workspace-item{display:flex;align-items:center;gap:7px;text-align:left;flex:1;padding:8px 6px;border:0;background:transparent;min-width:0}
+  .workspace-item:hover{background:transparent}
+  .workspace-row.active .workspace-item{color:var(--accent-ink);font-weight:650}
+  .workspace-more,.delete-workspace{width:25px;height:25px;font-size:15px;color:var(--muted);border-color:transparent;background:transparent}
+  .workspace-more:hover,.workspace-more[aria-expanded="true"],.delete-workspace:hover{border-color:var(--line);background:var(--panel);color:var(--ink)}
+  .delete-workspace:hover{color:var(--danger)}
+  .menu{position:fixed;z-index:6;min-width:170px;padding:4px;background:var(--panel);border:1px solid var(--line);border-radius:8px;box-shadow:var(--shadow-lg)}
+  .menu button{display:flex;align-items:center;width:100%;padding:7px 9px;border:0;border-radius:6px;background:transparent;text-align:left}
+  .menu button:hover,.menu button:focus-visible{background:var(--accent-soft);outline:none}
+  .suggest{max-height:220px;overflow:auto;min-width:210px;max-width:360px}
+  .suggest button{justify-content:space-between;gap:14px;font:12px ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+  .suggest button[aria-selected="true"]{background:var(--accent-soft);color:var(--accent-ink)}
+  .suggest-value{color:var(--muted);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .workspace-item .workspace-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1}
+  .main{min-width:0}
+  .workspace-toolbar{display:flex;align-items:center;justify-content:space-between;gap:12px;height:34px;margin:0 0 13px}
+  .workspace-title-wrap{min-width:0;display:flex;align-items:center;gap:9px}
+  .workspace-title{font-size:20px;font-weight:700;letter-spacing:-.35px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .rename-form{display:flex;align-items:center;gap:7px;flex:1;min-width:0;max-width:640px}
+  .rename-form input{font-size:16px;font-weight:650;padding:6px 9px}
+  .section{background:var(--panel);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow);margin:0 0 14px;overflow:hidden}
+  .section-head{padding:11px 14px;display:flex;align-items:center;justify-content:space-between;gap:10px;border-bottom:1px solid var(--line)}
+  h3{font-size:14px;margin:0}
+  .hint{color:var(--muted);font-size:12px;margin:2px 0 0}
+  .section-body{padding:12px 14px 14px}
+  .variables{display:grid;gap:8px}
+  .var-card{display:grid;grid-template-columns:auto auto auto minmax(0,2fr) auto minmax(0,3fr);align-items:center;gap:6px;border:1px solid var(--line);border-radius:8px;padding:6px;min-width:0;background:var(--panel)}
+  .var-eq{color:var(--muted);font:12px ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+  .field-label{display:block;color:var(--muted);font-size:10px;font-weight:700;letter-spacing:.045em;margin:0 0 4px}
+  input,textarea{width:100%;min-width:0;border:1px solid var(--line);border-radius:6px;padding:7px 8px;background:var(--panel);color:var(--ink)}
+  .var-name{font:12px ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;padding:6px 7px}
+  .var-name:disabled,textarea:disabled{background:var(--code);color:var(--ink);-webkit-text-fill-color:var(--ink)}
+  .var-card .icon-btn,.snippet-head .icon-btn,.title-edit,.label-btn,.settings-btn{width:25px;height:25px;font-size:15px;color:var(--muted);border-color:transparent;background:transparent}
+  .settings-btn[aria-pressed="true"]{color:var(--accent);border-color:var(--accent-line);background:var(--accent-soft)}
+  .var-card .icon-btn:hover,.snippet-head .icon-btn:hover,.title-edit:hover,.label-btn:hover{border-color:var(--line);background:var(--hover)}
+  .var-value{font-size:12px;padding:6px 7px}
+  .snippets{display:grid;gap:9px}
+  .snippet{display:grid;grid-template-columns:auto minmax(0,1fr);border:1px solid var(--line);border-radius:9px;overflow:hidden;background:var(--panel)}
+  .snippet-main{padding:10px 11px;min-width:0}
+  .drag-handle{display:grid;place-items:center;color:var(--muted);cursor:grab;font-size:15px}
+  .drag-handle:hover{color:var(--ink)}
+  .snippet>.drag-handle{width:22px;background:var(--code);border-right:1px solid var(--line)}
+  .dragging{opacity:.45}
+  .snippet-head{display:flex;align-items:center;gap:6px;margin-bottom:8px}
+  .snippet-desc{display:flex;align-items:center;gap:4px;min-width:0;margin:0 0 4px}
+  .snippet-desc .snippet-label{margin:0;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .snippet-label-input{display:block;width:auto;font-size:10px;font-weight:700;letter-spacing:.045em;padding:2px 5px;margin:0}
+  .snippet-desc .label-btn{width:20px;height:20px;font-size:12px}
+  .snippet-body{display:grid;gap:10px}
+  textarea{height:34px;min-height:34px;resize:vertical;font:12px/1.45 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+  .output-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:6px;align-items:start}
+  .output{min-height:34px;padding:7px 8px;border-radius:6px;background:var(--code);border:1px solid var(--line);white-space:pre-wrap;overflow-wrap:anywhere;font:12px/1.45 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+  .missing{color:var(--danger);background:var(--danger-soft);border-radius:3px}
+  /* Template highlighting: a backdrop behind the transparent textarea mirrors its text, with each {{variable}} wrapped in a mark. */
+  .tpl-wrap{position:relative;border-radius:6px;background:var(--panel)}
+  .tpl-wrap:has(textarea:disabled){background:var(--code)}
+  .tpl-wrap textarea,.tpl-wrap textarea:disabled{position:relative;display:block;background:transparent}
+  .tpl-backdrop{position:absolute;inset:0;overflow:hidden;pointer-events:none;padding:7px 8px;border:1px solid transparent;color:transparent;white-space:pre-wrap;overflow-wrap:break-word;font:12px/1.45 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+  .tpl-backdrop mark{color:transparent;background:none;border-radius:3px}
+  /* Colour coding appears only on the snippet that was last clicked. */
+  .snippet.is-active,.prompt-section.is-active{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)}
+  .snippet.is-active .tpl-backdrop mark,.snippet.is-active .interp,.prompt-section.is-active .interp{background:color-mix(in srgb,var(--c) 12%,transparent);box-shadow:inset 0 -1.5px color-mix(in srgb,var(--c) 55%,transparent);border-radius:3px}
+  .var-card.used{border-color:color-mix(in srgb,var(--c) 55%,transparent);box-shadow:0 0 0 1px color-mix(in srgb,var(--c) 30%,transparent)}
+  .no-highlight .snippet.is-active,.no-highlight .prompt-section.is-active{border-color:var(--line);box-shadow:none}
+  .no-highlight .snippet.is-active .tpl-backdrop mark,.no-highlight .snippet.is-active .interp,.no-highlight .prompt-section.is-active .interp{background:none;box-shadow:none}
+  .no-highlight .var-card.used{border-color:var(--line);box-shadow:none}
+  .var-card.fixed-var{grid-template-columns:minmax(0,2fr) auto minmax(0,3fr)}
+  .var-color{height:30px;padding:2px 3px;cursor:pointer}
+  .setting-row{display:flex;align-items:center;gap:14px}
+  .switch{position:relative;flex:none;width:36px;height:20px;padding:0;border:0;border-radius:999px;background:var(--line-strong)}
+  .switch::after{content:"";position:absolute;top:2px;left:2px;width:16px;height:16px;border-radius:50%;background:var(--panel);box-shadow:var(--shadow);transition:transform .15s}
+  .switch[aria-checked]:hover{background:var(--line-strong)}
+  .switch[aria-checked="true"],.switch[aria-checked="true"]:hover{background:var(--accent)}
+  .switch[aria-checked="true"]::after{transform:translateX(16px)}
+  .status{color:var(--muted);font-size:11px;margin-top:3px}
+  .status:empty{display:none}
+  .empty{color:var(--muted);font-size:13px;padding:7px 2px}
+  .palettes{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:10px}
+  .palette-option{display:grid;gap:9px;padding:12px;text-align:left;background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:10px}
+  .palette-option:hover{background:var(--bg);border-color:var(--line-strong)}
+  .palette-option[aria-pressed="true"]{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)}
+  .palette-name{display:flex;align-items:center;justify-content:space-between;font-weight:650}
+  .palette-check{color:var(--accent);visibility:hidden}
+  .palette-option[aria-pressed="true"] .palette-check{visibility:visible}
+  .palette-sample{color:var(--highlight);font-size:13px;font-weight:650}
+  .palette-swatches{display:flex;gap:4px}
+  .palette-swatches span{width:20px;height:20px;border-radius:6px;border:1px solid var(--line)}
+  /* Custom palettes store only base colours; the rest are mixed from them. */
+  [data-palette^="custom-"]{
+    --hover:color-mix(in srgb,var(--panel) 96%,var(--ink)); --line-strong:color-mix(in srgb,var(--line) 60%,var(--ink));
+    --accent-hover:color-mix(in srgb,var(--accent) 82%,#000); --accent-soft:color-mix(in srgb,var(--accent) 10%,var(--panel));
+    --accent-line:color-mix(in srgb,var(--accent) 22%,var(--panel)); --accent-ink:color-mix(in srgb,var(--accent) 80%,var(--ink));
+    --on-accent:#fff; --focus:color-mix(in srgb,var(--accent) 22%,transparent); --danger-soft:color-mix(in srgb,var(--danger) 12%,var(--panel));
+    --code:color-mix(in srgb,var(--bg) 50%,var(--panel)); --shadow:0 2px 10px #0000000d; --shadow-lg:0 6px 24px #00000024;
+  }
+  .palette-card{position:relative;display:grid}
+  .palette-actions{position:absolute;right:6px;bottom:8px;display:flex;gap:1px}
+  .palette-actions .icon-btn{width:24px;height:24px;font-size:14px;color:var(--muted);border-color:transparent;background:transparent}
+  .palette-actions .icon-btn:hover{color:var(--ink);border-color:var(--line);background:var(--panel)}
+  .palette-actions .delete-palette:hover{color:var(--danger)}
+  .palette-add{place-content:center;justify-items:center;gap:6px;color:var(--muted);border-style:dashed;font-weight:650}
+  .palette-add .ico{font-size:20px}
+  .palette-add:hover,.palette-add[aria-pressed="true"]{color:var(--accent);border-color:var(--accent);box-shadow:none}
+  .palette-form-foot{display:flex;align-items:flex-end;justify-content:space-between;gap:14px;flex-wrap:wrap}
+  .palette-form-foot .palette-option{min-width:230px}
+  .palette-form-actions{display:flex;gap:7px}
+  .section-head button{flex:none;white-space:nowrap}
+  .prompt{margin:0;max-height:340px;overflow:auto;padding:10px 12px;background:var(--code);border:1px solid var(--line);border-radius:6px;white-space:pre-wrap;overflow-wrap:anywhere;font:12px/1.5 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+  .about dl{display:grid;grid-template-columns:max-content 1fr;gap:6px 18px;margin:12px 0 0}
+  .about dt{color:var(--muted)}
+  .about dd{margin:0}
+  .about p{margin:0}
+  .workspace-empty{background:var(--panel);border:1px dashed var(--line-strong);border-radius:12px;padding:35px 20px;text-align:center;color:var(--muted)}
+  .workspace-empty strong{display:block;color:var(--ink);font-size:16px;margin-bottom:5px}
+  .toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--ink);color:var(--panel);padding:9px 14px;border-radius:8px;opacity:0;pointer-events:none;transition:opacity .18s;box-shadow:var(--shadow-lg);z-index:5}
+  .toast.show{opacity:1}
+  @media(max-width:760px){
+    .app-header{padding:16px}.layout{grid-template-columns:minmax(0,1fr);padding:13px;gap:13px}
+    .side-col{position:static}.workspace-list{max-height:none}
+    .workspace-toolbar{align-items:flex-start;flex-direction:column}
+    /* Like single-line inputs: no wrapping, overflow scrolls out of view without a scrollbar. */
+    .tpl-wrap textarea,.tpl-backdrop,.output{white-space:pre;overflow-wrap:normal}
+    .tpl-wrap textarea,.output{overflow-x:auto;scrollbar-width:none}
+    .tpl-wrap textarea::-webkit-scrollbar,.output::-webkit-scrollbar{display:none}
+  }
+</style>
+</head>
+<body>
+<header class="app-header">
+  <div class="brand">
+    <h1>VarPad</h1>
+    <p id="tagline" class="tagline">One tweak. Every snippet.</p>
+    <p class="description">A little workspace for reusable, variable-powered text. Set your values, watch your snippets update, and copy what you need.</p>
+  </div>
+</header>
+
+<div class="layout">
+  <div class="side-col">
+  <div class="zen-row"><button id="zenButton" class="icon-btn zen-btn" type="button" title="Zen mode" aria-label="Zen mode" aria-pressed="false"></button></div>
+  <aside class="sidebar" aria-label="Workspace collection">
+    <div class="side-head">
+      <div class="side-title"><button id="settingsButton" class="icon-btn settings-btn" type="button" title="Settings" aria-label="Settings" aria-pressed="false"></button><h2 id="sidebarTitle">Workspaces</h2></div>
+      <div id="sideActions" class="side-actions"><button id="addWorkspace" class="primary icon-btn" type="button" title="New workspace" aria-label="New workspace"></button><button id="workspacesMore" class="icon-btn workspace-more" type="button" data-menu-for="*" aria-haspopup="menu" aria-expanded="false" title="All workspaces actions" aria-label="All workspaces actions"></button></div>
+    </div>
+    <nav id="workspaceList" class="workspace-list" aria-label="Saved workspaces"></nav>
+  </aside>
+  </div>
+
+  <main id="workspaceView" class="main"></main>
+</div>
+<div id="workspaceMenu" class="menu" role="menu" hidden></div>
+<input id="importFile" type="file" accept=".json,application/json" multiple hidden>
+<input id="paletteImportFile" type="file" accept=".json,application/json" hidden>
+<div id="varSuggest" class="menu suggest" role="listbox" aria-label="Variables" hidden></div>
+<div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+<script>
+(() => {
+  const STORAGE_KEY = "varpad-workspaces-v2";
+  const TAGLINES = [
+    "One tweak. Every snippet.",
+    "When you're lazy, and careful.",
+    "Alt+Tab, Copy..., Alt+Tab, Paste..., Alt+Tab, Copy..., Alt+Tab, paste...",
+    "Set it. Snip it. Copy it.",
+    "Write once. Fill everywhere.",
+    "Live templates. Ready-to-copy text.",
+    "Reusable snippets, powered by variables.",
+    "A scratchpad for parameterized text.",
+    "Mix your values. Make your snippets.",
+    "A playground for reusable text.",
+    "Less typing. More doing.",
+    "Type a value. Watch it spread.",
+    "What you type is what you copy.",
+    "[un]Mad Libs for your terminal."
+  ];
+  // Icon paths from Lucide (lucide.dev, ISC license).
+  const ICONS = {
+    plus:'<path d="M5 12h14"/><path d="M12 5v14"/>',
+    trash:'<path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><path d="M10 11v6"/><path d="M14 11v6"/>',
+    lock:'<rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>',
+    unlock:'<rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 9.9-1"/>',
+    copy:'<rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/>',
+    pencil:'<path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/>',
+    grip:'<circle cx="9" cy="12" r="1"/><circle cx="9" cy="5" r="1"/><circle cx="9" cy="19" r="1"/><circle cx="15" cy="12" r="1"/><circle cx="15" cy="5" r="1"/><circle cx="15" cy="19" r="1"/>',
+    ellipsis:'<circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/>',
+    settings:'<path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/>',
+    check:'<path d="M20 6 9 17l-5-5"/>',
+    download:'<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/><path d="M12 15V3"/>',
+    upload:'<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m17 8-5-5-5 5"/><path d="M12 3v12"/>',
+    braces:'<path d="M8 3H7a2 2 0 0 0-2 2v5a2 2 0 0 1-2 2 2 2 0 0 1 2 2v5c0 1.1.9 2 2 2h1"/><path d="M16 21h1a2 2 0 0 0 2-2v-5c0-1.1.9-2 2-2a2 2 0 0 1-2-2V5a2 2 0 0 0-2-2h-1"/>'
+  };
+  const icon = name => `<svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[name]}</svg>`;
+  const $ = id => document.getElementById(id);
+  let toastTimer;
+  const unlocked = new Set();
+  let settingsOpen = false, activeSetting = "about";
+  const PALETTES = [{id:"day",name:"Day"},{id:"midnight",name:"Midnight"},{id:"forest",name:"Forest"}];
+  const PALETTE_FIELDS = [["bg","Background"],["panel","Panels"],["ink","Text"],["muted","Muted text"],["line","Borders"],["accent","Accent"],["highlight","Tagline"],["danger","Warnings"]];
+  const CUSTOM_PALETTES_KEY = "varpad-custom-palettes";
+  let customPalettes = [], paletteForm = null; // paletteForm: null (closed), "new", or the id of the custom palette being edited
+  try{customPalettes=(JSON.parse(localStorage.getItem(CUSTOM_PALETTES_KEY))||[]).filter(validPalette)}catch(_){}
+  function validPalette(x){return x&&/^custom-[\w-]+$/.test(x.id)&&typeof x.name==="string"&&PALETTE_FIELDS.every(([k])=>/^#[0-9a-f]{6}$/i.test(x.colors?.[k]))}
+  function saveCustomPalettes(){try{localStorage.setItem(CUSTOM_PALETTES_KEY,JSON.stringify(customPalettes))}catch(_){toast("Could not save palettes in this browser.")}}
+  // Palette files use the form labels as keys ("Background", "Accent", ...) with any CSS colour: hex, rgb() or hsl().
+  function slug(name){return String(name).replace(/[^a-z0-9-_]+/gi,"-").replace(/^-|-$/g,"")||"palette"}
+  function toHex(value){
+    if(typeof value!=="string"||!CSS.supports("color",value))return null;
+    const ctx=document.createElement("canvas").getContext("2d");ctx.fillStyle="#000";ctx.fillStyle=value;
+    const out=ctx.fillStyle,m=/^rgba?\((\d+),\s*(\d+),\s*(\d+)/.exec(out);
+    return m?"#"+m.slice(1,4).map(n=>(+n).toString(16).padStart(2,"0")).join(""):/^#[0-9a-f]{6}$/i.test(out)?out.toLowerCase():null;
+  }
+  function paletteJson(x){return {Name:x.name,...Object.fromEntries(PALETTE_FIELDS.map(([k,label])=>[label,x.colors[k]]))}}
+  function palettesFromJson(text){
+    const data=JSON.parse(text.trim().replace(/^```\w*\s*|\s*```$/g,""));
+    const list=Array.isArray(data)?data:Array.isArray(data?.palettes)?data.palettes:[data];
+    return list.filter(o=>o&&typeof o==="object").map(o=>{
+      const keys=Object.fromEntries(Object.entries(o).map(([k,v])=>[k.toLowerCase().trim(),v]));
+      const colors={};
+      for(const [k,label] of PALETTE_FIELDS){const hex=toHex(keys[label.toLowerCase()]??keys[k]);if(hex)colors[k]=hex}
+      return {name:String(keys.name??"").trim(),colors};
+    }).filter(p=>Object.keys(p.colors).length);
+  }
+  function exportAllPalettes(){
+    if(!customPalettes.length)return toast("No custom palettes to export yet.");
+    download("varpad-palettes.json",JSON.stringify({palettes:customPalettes.map(x=>paletteJson(x))},null,2),"application/json");
+    toast(`Exported ${customPalettes.length} custom palette${customPalettes.length===1?"":"s"}.`);
+  }
+  async function importPaletteFile(file){
+    let found;
+    try{found=palettesFromJson(await file.text())}catch(_){return toast("That file isn't valid JSON.")}
+    if(!found.length)return toast("No palette colours found in that file.");
+    const form=$("paletteForm");if(!form)return;
+    const current=Object.fromEntries(PALETTE_FIELDS.map(([k])=>[k,form.elements[k].value]));
+    if(found.length>1){
+      // Several palettes (e.g. an Export all file) are added directly; gaps take the form's current colours.
+      found.forEach(p=>customPalettes.push({id:`custom-${uid()}`,name:p.name||"Imported palette",colors:{...current,...p.colors}}));
+      saveCustomPalettes();injectCustomPalettes();paletteForm=null;renderWorkspace();
+      return toast(`Imported ${found.length} palettes.`);
+    }
+    const [p]=found;
+    if(p.name)$("paletteName").value=p.name;
+    for(const [k,v] of Object.entries(p.colors))form.elements[k].value=v;
+    form.dispatchEvent(new Event("input"));
+    const missing=PALETTE_FIELDS.length-Object.keys(p.colors).length;
+    toast(missing?`Palette loaded; ${missing} colour${missing===1?"":"s"} kept from before. Review and save.`:"Palette loaded. Review and save.");
+  }
+  function allPalettes(){return [...PALETTES,...customPalettes]}
+  function isDark(hex){const [r,g,b]=[1,3,5].map(i=>parseInt(hex.slice(i,i+2),16));return 0.299*r+0.587*g+0.114*b<128}
+  function paletteVars(colors){return `color-scheme:${isDark(colors.panel)?"dark":"light"};${PALETTE_FIELDS.map(([k])=>`--${k}:${colors[k]}`).join(";")}`}
+  function injectCustomPalettes(){
+    let el=$("customPaletteStyles");
+    if(!el){el=document.createElement("style");el.id="customPaletteStyles";document.head.appendChild(el)}
+    el.textContent=customPalettes.map(x=>`[data-palette="${x.id}"]{${paletteVars(x.colors)}}`).join("\n");
+  }
+  function hex6(v){v=v.trim();if(/^#[0-9a-f]{3}$/i.test(v))v="#"+[...v.slice(1)].map(c=>c+c).join("");return /^#[0-9a-f]{6}$/i.test(v)?v.toLowerCase():"#888888"}
+  function paletteCardInner(name){
+    return `<span class="palette-name"><span class="palette-label">${esc(name)}</span><span class="palette-check">${icon("check")}</span></span>
+          <span class="palette-sample">One tweak. Every snippet.</span>
+          <span class="palette-swatches">${["bg","panel","ink","muted","accent","highlight"].map(v=>`<span style="background:var(--${v})"></span>`).join("")}</span>`;
+  }
+  const AI_PROMPT = String.raw`VarPad is a browser-based scratchpad for reusable, parameterized text. A workspace holds variables (name/value pairs) and snippets (text templates). Templates reference variables with double curly braces, like {{host}}, and VarPad shows each snippet filled in with the current values, ready to copy. Changing a variable's value updates every snippet that uses it, so one workspace covers a whole family of similar commands, messages, or documents.
+
+A workspace is a JSON object in this shape:
+
+{
+  "name": "Server Maintenance",
+  "variables": [
+    { "name": "user", "value": "deploy" },
+    { "name": "host", "value": "server1.example.com" },
+    { "name": "app_dir", "value": "/var/www/myapp" }
+  ],
+  "snippets": [
+    { "title": "Connect to server", "template": "ssh {{user}}@{{host}}" },
+    { "title": "Go to the app", "template": "cd {{app_dir}}" }
+  ]
+}
+
+Rules:
+- "name" is a short, human-readable workspace title.
+- Variable names start with a letter or underscore and contain only letters, digits, underscores, dots, or hyphens. Prefer lower_snake_case.
+- Every {{variable}} used in a template must be defined in "variables" exactly once, with a realistic example value.
+- Pull every value that changes between uses (names, hosts, paths, IDs, dates, amounts) into a variable; keep fixed text in the template.
+- "title" is optional: a few words describing what the snippet is for.
+- Templates can span multiple lines; write line breaks as \n in the JSON string.
+- Order variables and snippets the way someone would use them, most common first.
+- Leave out "id" fields; VarPad assigns them.
+
+Reply with only the JSON object in a single code block, with no commentary.
+
+Generate me a workspace import for {{Your_VarPad_use_case}}`;
+  // The AI prompt page dog-foods VarPad: one variable fills the prompt template.
+  const USE_CASE_VAR = "Your_VarPad_use_case", USE_CASE_KEY = "varpad-ai-use-case";
+  let useCase = "Enter use case context";
+  try{useCase=localStorage.getItem(USE_CASE_KEY)??useCase}catch(_){}
+  function promptText(){return AI_PROMPT.replaceAll(`{{${USE_CASE_VAR}}}`,useCase)}
+  function promptHtml(){
+    const token=`{{${USE_CASE_VAR}}}`;
+    return AI_PROMPT.split(token).map(esc).join(useCase?`<span class="interp" style="--c:${VAR_COLORS[0]}">${esc(useCase)}</span>`:`<span class="missing" title="Unresolved variable">${esc(token)}</span>`);
+  }
+  const SETTINGS = [
+    {id:"about",name:"About",render:()=>`
+      <section class="section about"><div class="section-head"><div><h3>VarPad</h3><p class="hint">What this app is and where your data lives.</p></div></div><div class="section-body">
+        <p>VarPad is a notepad with variables for reusable text. Define values once, reference them with <code>{{variable_name}}</code>, and copy the filled-in snippets.</p>
+        <dl>
+          <dt>Storage</dt><dd>Saved in this browser's local storage</dd>
+          <dt>Source</dt><dd><a href="https://github.com/gritee/VarPad" target="_blank" rel="noopener noreferrer">GitHub repository</a></dd>
+          <dt>License</dt><dd><a href="https://opensource.org/license/mit/" target="_blank" rel="noopener noreferrer">MIT License</a></dd>
+        </dl>
+      </div></section>`},
+    {id:"palette",name:"Color Palette",render:()=>{
+      const current=document.documentElement.dataset.palette||"day";
+      // Each option carries its own data-palette, so it previews itself in that palette's colours.
+      const cards=allPalettes().map(x=>{
+        const custom=customPalettes.includes(x);
+        return `<div class="palette-card" data-palette="${x.id}">
+          <button type="button" class="palette-option" data-palette-id="${x.id}" aria-pressed="${x.id===current}">${paletteCardInner(x.name)}</button>
+          ${custom?`<div class="palette-actions"><button type="button" class="icon-btn" data-export-palette="${x.id}" title="Export palette" aria-label="Export palette ${esc(x.name)}">${icon("download")}</button><button type="button" class="icon-btn edit-palette" data-edit-palette="${x.id}" title="Edit palette" aria-label="Edit palette ${esc(x.name)}">${icon("pencil")}</button><button type="button" class="icon-btn delete-palette" data-delete-palette="${x.id}" title="Delete palette" aria-label="Delete palette ${esc(x.name)}">${icon("trash")}</button></div>`:""}
+        </div>`;
+      }).join("");
+      const add=`<button type="button" id="addPalette" class="palette-option palette-add" aria-pressed="${paletteForm==="new"}" aria-controls="paletteForm">${icon("plus")}Add custom palette...</button>`;
+      let form="";
+      if(paletteForm){
+        const editing=customPalettes.find(x=>x.id===paletteForm),cs=getComputedStyle(document.documentElement);
+        const start=editing?{...editing.colors}:Object.fromEntries(PALETTE_FIELDS.map(([k])=>[k,hex6(cs.getPropertyValue(`--${k}`))]));
+        // Dog-foods a workspace: the palette's settings are variables, and the preview is their rendered output.
+        const row=(label,field)=>`<div class="var-card fixed-var"><input class="var-name" value="${label}" aria-label="Variable name" disabled><span class="var-eq" aria-hidden="true">=</span>${field}</div>`;
+        form=`<form id="paletteForm">
+          <section class="section"><div class="section-head"><div><h3>${editing?"Edit palette":"New palette"}</h3><p class="hint">Pick the base colours; hover and tint shades are mixed from them.</p></div><button id="importPalette" type="button" class="small" title="Load colours from a JSON file">${icon("upload")}Import</button></div>
+            <div class="section-body"><div class="variables">
+              ${row("Name",`<input id="paletteName" class="var-value" maxlength="40" placeholder="My palette" value="${esc(editing?.name)}" aria-label="Palette name" required>`)}
+              ${PALETTE_FIELDS.map(([k,label])=>row(label,`<input type="color" class="var-value var-color" name="${k}" value="${start[k]}" aria-label="${label}">`)).join("")}
+            </div></div></section>
+          <section class="section"><div class="section-head"><div><h3>Preview</h3><p class="hint">How the palette will look.</p></div></div>
+            <div class="section-body palette-form-foot">
+              <div id="paletteDraft" class="palette-option" data-palette="custom-draft" style="${paletteVars(start)}">${paletteCardInner(editing?.name||"Preview")}</div>
+              <div class="palette-form-actions"><button id="cancelPalette" type="button">Cancel</button><button class="primary" type="submit">${editing?"Save palette":"Add palette"}</button></div>
+            </div></section>
+        </form>`;
+      }
+      const toggle=`<section class="section"><div class="section-body setting-row">
+          <button id="highlightToggle" class="switch" type="button" role="switch" aria-checked="${!document.documentElement.classList.contains("no-highlight")}" aria-label="Variable highlighting"></button>
+          <div><h3>Variable highlighting</h3><p class="hint">Colour-code each variable in the clicked snippet's template, output, and the variable list.</p></div>
+        </div></section>`;
+      return `${toggle}<section class="section"><div class="section-head"><div><h3>Theme</h3><p class="hint">Choose the colours VarPad uses, or add your own.</p></div></div><div class="section-body"><div class="palettes">${cards}${add}</div></div></section>${form}`;
+    },bind:root=>{
+      $("highlightToggle").addEventListener("click",e=>{const on=e.currentTarget.getAttribute("aria-checked")!=="true";e.currentTarget.setAttribute("aria-checked",String(on));setHighlight(on)});
+      root.querySelectorAll("[data-palette-id]").forEach(b=>b.addEventListener("click",()=>{
+        applyPalette(b.dataset.paletteId);
+        root.querySelectorAll("[data-palette-id]").forEach(o=>o.setAttribute("aria-pressed",String(o===b)));
+      }));
+      const openForm=mode=>{paletteForm=mode;renderWorkspace();if(paletteForm){$("paletteName").focus();$("paletteForm").scrollIntoView({block:"nearest",behavior:"smooth"})}};
+      $("addPalette").addEventListener("click",()=>openForm(paletteForm==="new"?null:"new"));
+      root.querySelectorAll("[data-edit-palette]").forEach(b=>b.addEventListener("click",()=>openForm(paletteForm===b.dataset.editPalette?null:b.dataset.editPalette)));
+      root.querySelectorAll("[data-delete-palette]").forEach(b=>b.addEventListener("click",()=>{
+        const x=customPalettes.find(p=>p.id===b.dataset.deletePalette);
+        if(!x)return;
+        customPalettes=customPalettes.filter(p=>p!==x);saveCustomPalettes();injectCustomPalettes();
+        if(document.documentElement.dataset.palette===x.id)applyPalette("day");
+        if(paletteForm===x.id)paletteForm=null;
+        renderWorkspace();toast(`Palette "${x.name}" deleted.`);
+      }));
+      root.querySelectorAll("[data-export-palette]").forEach(b=>b.addEventListener("click",()=>{
+        const x=customPalettes.find(p=>p.id===b.dataset.exportPalette);
+        if(x){download(`${slug(x.name)}-palette.json`,JSON.stringify(paletteJson(x),null,2),"application/json");toast(`Palette "${x.name}" exported.`)}
+      }));
+      const form=$("paletteForm");if(!form)return;
+      $("importPalette").addEventListener("click",()=>$("paletteImportFile").click());
+      const colors=()=>Object.fromEntries(PALETTE_FIELDS.map(([k])=>[k,form.elements[k].value]));
+      form.addEventListener("input",e=>{
+        $("paletteDraft").setAttribute("style",paletteVars(colors()));
+        $("paletteDraft").querySelector(".palette-label").textContent=$("paletteName").value.trim()||"Preview";
+      });
+      $("cancelPalette").addEventListener("click",()=>{paletteForm=null;renderWorkspace()});
+      form.addEventListener("submit",e=>{
+        e.preventDefault();
+        const name=$("paletteName").value.trim();if(!name)return $("paletteName").focus();
+        let x=customPalettes.find(p=>p.id===paletteForm);
+        if(x)Object.assign(x,{name,colors:colors()});else customPalettes.push(x={id:`custom-${uid()}`,name,colors:colors()});
+        saveCustomPalettes();injectCustomPalettes();applyPalette(x.id);
+        toast(`Palette "${name}" ${paletteForm==="new"?"added":"saved"}.`);paletteForm=null;renderWorkspace();
+      });
+    }},
+    {id:"ai-prompt",name:"AI prompt",render:()=>`
+      <section class="section">
+        <div class="section-head"><div><h3>Variables</h3><p class="hint">Describe what you want a workspace for; it fills in the prompt below.</p></div></div>
+        <div class="section-body"><div class="variables"><div id="useCaseCard" class="var-card fixed-var" style="--c:${VAR_COLORS[0]}">
+          <input class="var-name" value="${USE_CASE_VAR}" aria-label="Variable name" disabled>
+          <span class="var-eq" aria-hidden="true">=</span>
+          <input id="useCase" class="var-value" value="${esc(useCase)}" placeholder="Enter use case context" aria-label="Your VarPad use case">
+        </div></div></div>
+      </section>
+      <section id="promptSection" class="section prompt-section">
+        <div class="section-head"><div><h3>Generate a workspace</h3><p class="hint">Copy into an AI assistant and it will reply with workspace JSON to import.</p></div><button id="copyPrompt" class="primary small" type="button">${icon("copy")}Copy prompt</button></div>
+        <div class="section-body"><pre id="promptOutput" class="prompt">${promptHtml()}</pre></div>
+      </section>`,bind:()=>{
+      $("useCase").addEventListener("input",e=>{
+        useCase=e.target.value;$("promptOutput").innerHTML=promptHtml();
+        try{localStorage.setItem(USE_CASE_KEY,useCase)}catch(_){}
+      });
+      $("copyPrompt").addEventListener("click",()=>copyText(promptText(),"Prompt copied."));
+    }},
+    {id:"obsidian",name:"Obsidian plugin",render:()=>`
+      <section class="section about"><div class="section-head"><div><h3>Obsidian plugin</h3><p class="hint">Use VarPad variables and snippets inside your notes.</p></div></div><div class="section-body">
+        <dl>
+          <dt>Status</dt><dd>Pending community plugin approval</dd>
+          <dt>Manual install</dt><dd><a href="https://github.com/gritee/varpad-obsidian-plugin" target="_blank" rel="noopener noreferrer">gritee/varpad-obsidian-plugin</a></dd>
+        </dl>
+      </div></section>`}
+  ];
+  function highlightOn(){try{return localStorage.getItem("varpad-highlight")!=="0"}catch(_){return true}}
+  function setHighlight(on){
+    document.documentElement.classList.toggle("no-highlight",!on);
+    try{localStorage.setItem("varpad-highlight",on?"1":"0")}catch(_){}
+  }
+  document.documentElement.classList.toggle("no-highlight",!highlightOn());
+  function applyPalette(id){
+    document.documentElement.dataset.palette=id;
+    try{localStorage.setItem("varpad-palette",id)}catch(_){}
+  }
+  injectCustomPalettes();
+  try{const saved=localStorage.getItem("varpad-palette");if(allPalettes().some(x=>x.id===saved))document.documentElement.dataset.palette=saved}catch(_){}
+  let state = loadState();
+
+  function uid(){return crypto.randomUUID ? crypto.randomUUID() : String(Date.now())+Math.random().toString(16).slice(2)}
+  // First-run examples: ad hoc tasks repeated with different inputs, where each run only needs fresh variable values.
+  function exampleWorkspaces(){
+    const v=(name,value)=>({id:uid(),name,value}),s=(title,template)=>({id:uid(),title,template});
+    return [
+      {id:uid(),name:"Trace user 500s",variables:[
+        v("env","prod"),v("email","dana@example.com"),v("since_minutes","120")
+      ],snippets:[
+        s("1. Find the customer's account","psql service={{env}} -c \"select id, plan, status, created_at from accounts where email = '{{email}}';\""),
+        s("2. Pull their server errors from the logs, newest first",
+          "aws logs filter-log-events --profile {{env}} --log-group-name /app/api \\\n  --start-time $(( ($(date +%s) - {{since_minutes}} * 60) * 1000 )) \\\n  --filter-pattern '{ $.user_email = \"{{email}}\" && $.status >= 500 }' \\\n  --query 'events[].message' --output text \\\n  | jq -r '[.time, .request_id, .method, .path, .status, .error] | @tsv' | sort -r"),
+        s("3. Open the account in the admin console","open \"https://admin.{{env}}.example.com/accounts?email={{email}}\"")
+      ]},
+      {id:uid(),name:"Debug k8s pod",variables:[
+        v("namespace","payments"),v("pod","billing-api-7c9d8f6b5-x2kqp"),v("port","8080"),v("local_port","18080")
+      ],snippets:[
+        s("1. Check its events and restarts","kubectl -n {{namespace}} describe pod {{pod}} | sed -n '/Containers:/,$p'"),
+        s("2. Hit its health endpoint directly, bypassing the Service and ingress",
+          "kubectl -n {{namespace}} port-forward pod/{{pod}} {{local_port}}:{{port}} >/dev/null & pf=$!\nsleep 2 && curl -fsS -w '\\nHTTP %{http_code} in %{time_total}s\\n' http://localhost:{{local_port}}/healthz\nkill $pf"),
+        s("3. Shell in to poke around","kubectl -n {{namespace}} exec -it {{pod}} -- sh")
+      ]}
+    ];
+  }
+  function loadState(){
+    try{
+      const s=JSON.parse(localStorage.getItem(STORAGE_KEY));
+      if(s && Array.isArray(s.workspaces)) return {workspaces:s.workspaces,activeId:s.activeId || s.workspaces[0]?.id || null};
+      // Migrate the earlier single-workspace VarPad format.
+      const old=JSON.parse(localStorage.getItem("varpad-workspace-v1"));
+      if(old && Array.isArray(old.variables) && Array.isArray(old.snippets)){
+        const w={id:uid(),name:"My Workspace",variables:old.variables,snippets:old.snippets};
+        return {workspaces:[w],activeId:w.id};
+      }
+    }catch(_){}
+    const examples=exampleWorkspaces();
+    return {workspaces:examples,activeId:examples[0].id};
+  }
+  function active(){return state.workspaces.find(w=>w.id===state.activeId)||null}
+  function save(){try{localStorage.setItem(STORAGE_KEY,JSON.stringify(state))}catch(_){toast("Could not save in this browser. Export your workspace to keep it.")}}
+  function toast(message){const el=$("toast");el.textContent=message;el.classList.add("show");clearTimeout(toastTimer);toastTimer=setTimeout(()=>el.classList.remove("show"),2000)}
+  function esc(s){return String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]))}
+  function varName(s){return String(s||"").trim().replace(/\s+/g,"_")}
+  function values(w){const m={};w.variables.forEach(v=>{const k=varName(v.name);if(k)m[k]=v.value});return m}
+  function partsFor(w,template){
+    const map=values(w),out=[],re=/\{\{\s*([a-zA-Z_][\w.-]*)\s*\}\}/g;let last=0,m;
+    while((m=re.exec(template))){if(m.index>last)out.push({text:template.slice(last,m.index)});out.push(Object.prototype.hasOwnProperty.call(map,m[1])?{text:map[m[1]],name:m[1]}:{text:m[0],name:m[1],missing:true});last=re.lastIndex}
+    if(last<template.length)out.push({text:template.slice(last)});return out;
+  }
+  const VAR_COLORS = ["#e8590c","#1c7ed6","#2f9e44","#ae3ec9","#f59f00","#0c8599","#e64980","#74b816"];
+  let activeSnippetId = null;
+  function varColors(w){const c={};w.variables.forEach(v=>{const k=varName(v.name);if(k&&!(k in c))c[k]=VAR_COLORS[Object.keys(c).length%VAR_COLORS.length]});return c}
+  function outputHtml(ps,colors){
+    return ps.map(p=>p.missing?`<span class="missing" title="Unresolved variable">${esc(p.text)}</span>`:p.name?`<span class="interp" style="--c:${colors[p.name]}">${esc(p.text)}</span>`:esc(p.text)).join("")||'<span class="status">Rendered text appears here.</span>';
+  }
+  function backdropHtml(template,colors){
+    // The trailing space keeps a final newline the same height as in the textarea.
+    return esc(template).replace(/\{\{\s*([a-zA-Z_][\w.-]*)\s*\}\}/g,(t,n)=>`<mark style="--c:${colors[n]||"var(--danger)"}">${t}</mark>`)+" ";
+  }
+  function setActiveSnippet(id){if(activeSnippetId!==id){activeSnippetId=id;applyActiveSnippet()}}
+  // Only toggles classes, so activating a snippet never replaces text the user may be selecting.
+  function applyActiveSnippet(){
+    const w=active();if(!w)return;
+    const s=w.snippets.find(x=>x.id===activeSnippetId);
+    const used=new Set(s?partsFor(w,s.template).filter(p=>p.name&&!p.missing).map(p=>p.name):[]);
+    document.querySelectorAll(".snippet").forEach(card=>card.classList.toggle("is-active",card.dataset.snippetId===activeSnippetId));
+    document.querySelectorAll(".var-card").forEach(card=>{const v=w.variables.find(x=>x.id===card.dataset.variableId);card.classList.toggle("used",!!v&&used.has(varName(v.name)))});
+  }
+  function renderText(w,t){return partsFor(w,t).map(p=>p.text).join("")}
+  function renderSidebar(){
+    $("sidebarTitle").textContent=settingsOpen?"Settings":"Workspaces";
+    $("sideActions").hidden=settingsOpen;
+    $("settingsButton").setAttribute("aria-pressed",String(settingsOpen));
+    $("workspaceList").setAttribute("aria-label",settingsOpen?"Settings":"Saved workspaces");
+    if(settingsOpen){
+      $("workspaceList").innerHTML=SETTINGS.map(x=>`
+        <div class="workspace-row ${x.id===activeSetting?"active":""}">
+          <button type="button" class="workspace-item" data-setting-id="${x.id}"><span class="workspace-name">${x.name}</span></button>
+          ${x.id==="palette"?`<button type="button" class="icon-btn workspace-more" data-menu-for="palettes" aria-haspopup="menu" aria-expanded="false" title="Palette actions" aria-label="Palette actions">${icon("ellipsis")}</button>`:""}
+        </div>`).join("");
+      return;
+    }
+    $("workspaceList").innerHTML=state.workspaces.map(w=>`
+      <div class="workspace-row ${w.id===state.activeId?"active":""}" data-row-id="${esc(w.id)}">
+        <span class="drag-handle" title="Drag to reorder" aria-hidden="true">${icon("grip")}</span>
+        <button type="button" class="workspace-item" data-workspace-id="${esc(w.id)}" title="${esc(w.name)}"><span class="workspace-name">${esc(w.name)}</span></button>
+        <button type="button" class="icon-btn delete-workspace" data-delete-workspace="${esc(w.id)}" title="Delete workspace" aria-label="Delete workspace ${esc(w.name)}">${icon("trash")}</button>
+        <button type="button" class="icon-btn workspace-more" data-menu-for="${esc(w.id)}" aria-haspopup="menu" aria-expanded="false" title="Workspace actions" aria-label="Workspace actions">${icon("ellipsis")}</button>
+      </div>`).join("") || '<div class="empty">No workspaces yet.</div>';
+    bindReorder($("workspaceList"),".workspace-row",()=>state.workspaces,el=>el.dataset.rowId);
+  }
+  function renderWorkspace(){
+    const w=active(),root=$("workspaceView");
+    hideSuggest();
+    if(settingsOpen){
+      const x=SETTINGS.find(x=>x.id===activeSetting);
+      root.innerHTML=`<div class="workspace-toolbar"><div class="workspace-title">${x.name}</div></div>${x.render()}`;
+      x.bind?.(root);
+      return;
+    }
+    if(!w){root.innerHTML=`<div class="workspace-empty"><strong>No workspace selected</strong>Create a workspace to start collecting variables and snippets.</div>`;return}
+    const variableCards=w.variables.map(v=>`
+      <div class="var-card" data-variable-id="${esc(v.id)}">
+        <span class="drag-handle" title="Drag to reorder" aria-hidden="true">${icon("grip")}</span>
+        <button type="button" class="icon-btn delete-variable" title="Remove variable" aria-label="Remove variable">${icon("trash")}</button>
+        <button type="button" class="icon-btn lock-btn" ${lockAttrs(unlocked.has(v.id),"variable name")}>${icon(unlocked.has(v.id)?"unlock":"lock")}</button>
+        <input class="var-name" data-field="name" aria-label="Variable name" value="${esc(v.name)}" placeholder="variable_name" spellcheck="false" ${unlocked.has(v.id)?"":"disabled"}>
+        <span class="var-eq" aria-hidden="true">=</span>
+        <input class="var-value" data-field="value" aria-label="Variable value" value="${esc(v.value)}" placeholder="Value">
+      </div>`).join("");
+    const snippetCards=w.snippets.map((s,i)=>{
+      return `<article class="snippet" data-snippet-id="${esc(s.id)}">
+        <span class="drag-handle" title="Drag to reorder" aria-hidden="true">${icon("grip")}</span>
+        <div class="snippet-main">
+        <div class="snippet-head"><button type="button" class="icon-btn delete-snippet" title="Remove snippet" aria-label="Remove snippet">${icon("trash")}</button><button type="button" class="icon-btn lock-btn" ${lockAttrs(unlocked.has(s.id),"template")}>${icon(unlocked.has(s.id)?"unlock":"lock")}</button></div>
+        <div class="snippet-body">
+          <div><div class="snippet-desc"><label class="field-label snippet-label" ${s.title?.trim()?"":"hidden"}>${esc(s.title?.trim())}</label><input class="snippet-label-input" data-field="title" aria-label="Snippet description" value="${esc(s.title)}" placeholder="Description" spellcheck="false" hidden><button type="button" class="icon-btn label-btn" title="Edit description" aria-label="Edit description">${icon("pencil")}</button></div><div class="tpl-wrap"><div class="tpl-backdrop" aria-hidden="true"></div><textarea data-field="template" aria-label="Snippet template" spellcheck="false" placeholder="Type text and use {{variable_name}}" ${unlocked.has(s.id)?"":"disabled"}>${esc(s.template)}</textarea></div></div>
+          <div><div class="output-row"><div class="output" aria-live="polite"></div><button type="button" class="icon-btn copy-snippet" title="Copy output" aria-label="Copy output">${icon("copy")}</button></div><div class="status"></div></div>
+        </div>
+        </div>
+      </article>`;
+    }).join("");
+    root.innerHTML=`
+      <div class="workspace-toolbar">
+        <div class="workspace-title-wrap"><div class="workspace-title" title="${esc(w.name)}">${esc(w.name)}</div><button id="renameWorkspace" class="icon-btn title-edit" type="button" title="Edit workspace name" aria-label="Edit workspace name">${icon("pencil")}</button></div>
+        <div id="renameForm" class="rename-form" hidden><input id="renameInput" aria-label="Workspace name" maxlength="120"></div>
+      </div>
+      <section class="section">
+        <div class="section-head"><div><h3>Variables</h3><p class="hint">Shared values referenced with <code>{{variable_name}}</code>.</p></div><button id="addVariable" class="primary icon-btn" type="button" title="Add variable" aria-label="Add variable">${icon("plus")}</button></div>
+        <div class="section-body"><div class="variables">${variableCards}</div><div class="empty" ${w.variables.length?"hidden":""}>No variables yet. Add one when you need a reusable value.</div></div>
+      </section>
+      <section class="section">
+        <div class="section-head"><div><h3>Snippets</h3><p class="hint">Edit a template; its copy-ready output updates automatically.</p></div><button id="addSnippet" class="primary icon-btn" type="button" title="Add snippet" aria-label="Add snippet">${icon("plus")}</button></div>
+        <div class="section-body"><div class="snippets">${snippetCards}</div><div class="empty" ${w.snippets.length?"hidden":""}>No snippets yet. Add one to compose your first command or text block.</div></div>
+      </section>`;
+    $("addVariable").addEventListener("click",addVariable);
+    $("addSnippet").addEventListener("click",addSnippet);
+    $("renameWorkspace").addEventListener("click",renameWorkspace);
+    $("renameInput").addEventListener("keydown",e=>{if(e.key==="Escape")e.target.value=w.name;if(e.key==="Enter"||e.key==="Escape"){e.preventDefault();e.target.blur()}});
+    $("renameInput").addEventListener("blur",e=>{
+      const name=e.target.value.trim();
+      if(name&&name!==w.name){w.name=name;render();return}
+      $("renameForm").hidden=true;document.querySelector(".workspace-title-wrap").hidden=false;
+    });
+    root.querySelectorAll(".var-card").forEach(card=>{
+      card.addEventListener("input",e=>{const v=active()?.variables.find(x=>x.id===card.dataset.variableId);if(!v)return;v[e.target.dataset.field]=e.target.value;save();renderSnippetOutputsOnly()});
+      card.querySelector(".delete-variable").addEventListener("click",()=>{const a=active();a.variables=a.variables.filter(v=>v.id!==card.dataset.variableId);unlocked.delete(card.dataset.variableId);save();renderWorkspace()});
+      bindLock(card.dataset.variableId,card.querySelector(".var-name"),card.querySelector(".lock-btn"),"variable name");
+    });
+    root.querySelectorAll(".snippet").forEach(card=>{
+      card.addEventListener("input",e=>{const s=active()?.snippets.find(x=>x.id===card.dataset.snippetId);if(!s)return;s[e.target.dataset.field]=e.target.value;save();if(e.target.dataset.field==="template")renderSnippetOutputsOnly()});
+      card.querySelector(".delete-snippet").addEventListener("click",()=>{const a=active();a.snippets=a.snippets.filter(s=>s.id!==card.dataset.snippetId);unlocked.delete(card.dataset.snippetId);save();renderWorkspace()});
+      bindLock(card.dataset.snippetId,card.querySelector("textarea"),card.querySelector(".lock-btn"),"template");
+      bindSuggest(card.querySelector("textarea"));
+      card.querySelector("textarea").addEventListener("scroll",e=>{const b=card.querySelector(".tpl-backdrop");b.scrollTop=e.target.scrollTop;b.scrollLeft=e.target.scrollLeft});
+      // Enter finishes editing (blur relocks); Shift+Enter inserts a newline. The variable list claims Enter first while open.
+      card.querySelector("textarea").addEventListener("keydown",e=>{if(e.key==="Enter"&&!e.shiftKey&&!e.isComposing&&!e.defaultPrevented){e.preventDefault();e.target.blur()}});
+      bindLabelEdit(card.querySelector(".snippet-label"),card.querySelector(".snippet-label-input"),card.querySelector(".label-btn"));
+      card.querySelector(".copy-snippet").addEventListener("click",()=>{const s=active()?.snippets.find(x=>x.id===card.dataset.snippetId);if(s)copyText(renderText(active(),s.template))});
+    });
+    bindReorder(root.querySelector(".variables"),".var-card",()=>active()?.variables,el=>el.dataset.variableId);
+    bindReorder(root.querySelector(".snippets"),".snippet",()=>active()?.snippets,el=>el.dataset.snippetId);
+    renderSnippetOutputsOnly();
+  }
+  function bindReorder(container,selector,getList,idOf){
+    let dragged=null;
+    container.querySelectorAll(selector).forEach(item=>{
+      const handle=item.querySelector(".drag-handle");
+      // Only the handle starts a drag, so text inside the item stays selectable.
+      handle.addEventListener("pointerdown",()=>{item.draggable=true});
+      handle.addEventListener("pointerup",()=>{item.draggable=false});
+      item.addEventListener("dragstart",e=>{dragged=item;item.classList.add("dragging");e.dataTransfer.effectAllowed="move";e.dataTransfer.setData("text/plain","")});
+      item.addEventListener("dragend",()=>{
+        item.draggable=false;item.classList.remove("dragging");dragged=null;
+        const list=getList();if(!list)return;
+        const order=[...container.querySelectorAll(selector)].map(idOf);
+        list.sort((a,b)=>order.indexOf(a.id)-order.indexOf(b.id));save();renderSnippetOutputsOnly();
+      });
+      item.addEventListener("dragover",e=>{
+        if(!dragged||dragged===item)return;
+        e.preventDefault();e.dataTransfer.dropEffect="move";
+        // Compare against the item's midpoint so items of uneven height don't flip back and forth.
+        const r=item.getBoundingClientRect();
+        const after=e.clientY>r.top+r.height/2;
+        container.insertBefore(dragged,after?item.nextSibling:item);
+      });
+      item.addEventListener("drop",e=>e.preventDefault());
+    });
+  }
+  function bindLabelEdit(label,field,btn){
+    const setEditing=editing=>{field.hidden=!editing;label.textContent=field.value.trim();label.hidden=editing||!label.textContent};
+    // When editing an existing description, size the input to the label's text instead of the default creation width.
+    const matchLabelWidth=textWidth=>{
+      const cs=getComputedStyle(field),chrome=["paddingLeft","paddingRight","borderLeftWidth","borderRightWidth"].reduce((n,k)=>n+parseFloat(cs[k]),0);
+      field.style.width=textWidth?`${Math.ceil(textWidth+chrome)}px`:"";
+    };
+    btn.addEventListener("mousedown",e=>{if(!field.hidden)e.preventDefault()});
+    btn.addEventListener("click",()=>{if(field.hidden){const w=label.hidden?0:label.getBoundingClientRect().width;setEditing(true);matchLabelWidth(w);field.focus();field.select()}else field.blur()});
+    field.addEventListener("keydown",e=>{if(e.key==="Enter")field.blur()});
+    field.addEventListener("blur",()=>setEditing(false));
+  }
+  function lockLabel(isUnlocked,label){return `${isUnlocked?"Lock":"Unlock"} ${label}`}
+  function lockAttrs(isUnlocked,label){const t=lockLabel(isUnlocked,label);return `title="${t}" aria-label="${t}"`}
+  // Variable autocomplete: typing {{ in a template lists matching variable names until the braces are closed.
+  let suggest=null;
+  function hideSuggest(){
+    if(!suggest)return;
+    suggest.ta.removeAttribute("aria-activedescendant");suggest=null;$("varSuggest").hidden=true;
+  }
+  function caretCoords(ta,pos){
+    // Mirror the textarea's text into a hidden div to measure where the caret sits.
+    const cs=getComputedStyle(ta),div=document.createElement("div"),mark=document.createElement("span");
+    for(const p of ["boxSizing","width","fontFamily","fontSize","fontWeight","lineHeight","letterSpacing","tabSize","paddingTop","paddingRight","paddingBottom","paddingLeft","borderTopWidth","borderRightWidth","borderBottomWidth","borderLeftWidth"])div.style[p]=cs[p];
+    Object.assign(div.style,{position:"absolute",visibility:"hidden",top:"0",left:"-9999px",borderStyle:"solid",whiteSpace:cs.whiteSpace,overflowWrap:cs.overflowWrap});
+    div.textContent=ta.value.slice(0,pos);mark.textContent="\u200b";div.appendChild(mark);document.body.appendChild(div);
+    const c={top:mark.offsetTop,left:mark.offsetLeft,height:parseFloat(cs.lineHeight)||mark.offsetHeight};
+    div.remove();return c;
+  }
+  function updateSuggest(ta){
+    const w=active(),m=w&&ta.selectionStart===ta.selectionEnd&&/\{\{\s*([\w.-]*)$/.exec(ta.value.slice(0,ta.selectionStart));
+    if(!m)return hideSuggest();
+    const q=m[1].toLowerCase(),map=values(w);
+    const items=Object.keys(map).filter(n=>/^[a-zA-Z_][\w.-]*$/.test(n)&&n.toLowerCase().includes(q))
+      .sort((a,b)=>b.toLowerCase().startsWith(q)-a.toLowerCase().startsWith(q));
+    if(!items.length)return hideSuggest();
+    const prev=suggest?.ta===ta?suggest.items[suggest.index]:null;
+    suggest={ta,items,index:Math.max(0,items.indexOf(prev)),start:ta.selectionStart-m[1].length};
+    const el=$("varSuggest");
+    el.innerHTML=items.map((n,i)=>`<button type="button" role="option" id="varSuggest-${i}" data-i="${i}" aria-selected="${i===suggest.index}"><span>${esc(n)}</span><span class="suggest-value">${esc(map[n])}</span></button>`).join("");
+    el.hidden=false;ta.setAttribute("aria-activedescendant",`varSuggest-${suggest.index}`);
+    const r=ta.getBoundingClientRect(),c=caretCoords(ta,suggest.start);
+    el.style.top=`${Math.min(r.top+c.top-ta.scrollTop+c.height+4,innerHeight-el.offsetHeight-8)}px`;
+    el.style.left=`${Math.max(8,Math.min(r.left+c.left-ta.scrollLeft,innerWidth-el.offsetWidth-8))}px`;
+    el.querySelector('[aria-selected="true"]').scrollIntoView({block:"nearest"});
+  }
+  function moveSuggest(step){
+    suggest.index=(suggest.index+step+suggest.items.length)%suggest.items.length;
+    $("varSuggest").querySelectorAll("[role=option]").forEach((o,i)=>o.setAttribute("aria-selected",String(i===suggest.index)));
+    suggest.ta.setAttribute("aria-activedescendant",`varSuggest-${suggest.index}`);
+    $(`varSuggest-${suggest.index}`).scrollIntoView({block:"nearest"});
+  }
+  function chooseSuggest(i){
+    const {ta,items,start}=suggest,end=ta.selectionStart,closing=/^\s*\}\}/.exec(ta.value.slice(end));
+    ta.setRangeText(items[i]+(closing?"":"}}"),start,end,"end");
+    // Skip over braces that were already there rather than doubling them.
+    if(closing)ta.selectionStart=ta.selectionEnd=start+items[i].length+closing[0].length;
+    hideSuggest();ta.dispatchEvent(new Event("input",{bubbles:true}));
+  }
+  function bindSuggest(ta){
+    ta.setAttribute("aria-autocomplete","list");ta.setAttribute("aria-controls","varSuggest");
+    ta.addEventListener("input",()=>updateSuggest(ta));
+    ta.addEventListener("click",()=>updateSuggest(ta));
+    ta.addEventListener("keyup",e=>{if(["ArrowLeft","ArrowRight","Home","End"].includes(e.key))updateSuggest(ta)});
+    ta.addEventListener("blur",hideSuggest);
+    ta.addEventListener("keydown",e=>{
+      if(suggest?.ta!==ta)return;
+      if(e.key==="ArrowDown"||e.key==="ArrowUp"){e.preventDefault();moveSuggest(e.key==="ArrowDown"?1:-1)}
+      else if(e.key==="Enter"||e.key==="Tab"){e.preventDefault();chooseSuggest(suggest.index)}
+      else if(e.key==="Escape"){e.preventDefault();hideSuggest()}
+    });
+  }
+  function bindLock(id,field,lock,label){
+    const setLocked=locked=>{field.disabled=locked;lock.innerHTML=icon(locked?"lock":"unlock");const t=lockLabel(!locked,label);lock.title=t;lock.setAttribute("aria-label",t);if(locked)unlocked.delete(id);else unlocked.add(id)};
+    // Keep focus in the field so a click on the open lock relocks via blur instead of re-unlocking.
+    lock.addEventListener("mousedown",e=>{if(!field.disabled)e.preventDefault()});
+    lock.addEventListener("click",()=>{if(field.disabled){setLocked(false);field.focus()}else field.blur()});
+    field.addEventListener("blur",()=>setLocked(true));
+  }
+  function renderSnippetOutputsOnly(){
+    const w=active();if(!w)return;
+    const colors=varColors(w);
+    document.querySelectorAll(".snippet").forEach(card=>{
+      const s=w.snippets.find(x=>x.id===card.dataset.snippetId);if(!s)return;
+      const ps=partsFor(w,s.template);
+      card.querySelector(".output").innerHTML=outputHtml(ps,colors);
+      card.querySelector(".tpl-backdrop").innerHTML=backdropHtml(s.template,colors);
+      card.querySelector(".status").textContent=ps.some(p=>p.missing)?"Unresolved variable(s) highlighted":"";
+    });
+    document.querySelectorAll(".var-card").forEach(card=>{
+      const v=w.variables.find(x=>x.id===card.dataset.variableId);
+      card.style.setProperty("--c",colors[v&&varName(v.name)]||"transparent");
+    });
+    applyActiveSnippet();
+  }
+  function render(){renderSidebar();renderWorkspace();save()}
+  function addWorkspace(){
+    const n=state.workspaces.length+1,w={id:uid(),name:`New Workspace ${n}`,variables:[],snippets:[]};
+    state.workspaces.push(w);state.activeId=w.id;render();renameWorkspace();
+  }
+  function renameWorkspace(){
+    const w=active();if(!w)return;
+    $("renameInput").value=w.name;
+    document.querySelector(".workspace-title-wrap").hidden=true;$("renameForm").hidden=false;
+    $("renameInput").focus();$("renameInput").select();
+  }
+  function addVariable(){
+    const w=active();let base="new_variable",name=base,n=2,used=new Set(w.variables.map(v=>varName(v.name)));
+    while(used.has(name))name=`${base}_${n++}`;
+    const v={id:uid(),name,value:""};unlocked.add(v.id);w.variables.push(v);render();const el=document.querySelector(".var-card:last-child .var-name");el?.focus();el?.select();
+  }
+  function addSnippet(){
+    const w=active(),s={id:uid(),template:""};unlocked.add(s.id);w.snippets.push(s);render();const el=document.querySelector(".snippet:last-child textarea");el?.focus();
+  }
+  function download(filename,content,type){
+    const blob=new Blob([content],{type}),url=URL.createObjectURL(blob),a=document.createElement("a");
+    a.href=url;a.download=filename;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);
+  }
+  // Accepts a single workspace, {workspaces:[...]} from Export all, or a bare array; ids are always reassigned.
+  function workspacesFromJson(text){
+    const data=JSON.parse(text.trim().replace(/^```\w*\s*|\s*```$/g,""));
+    const list=Array.isArray(data)?data:Array.isArray(data?.workspaces)?data.workspaces:[data];
+    return list.filter(w=>w&&typeof w==="object"&&(Array.isArray(w.variables)||Array.isArray(w.snippets))).map(w=>({
+      id:uid(),
+      name:String(w.name||"").trim()||"Imported workspace",
+      variables:(Array.isArray(w.variables)?w.variables:[]).filter(v=>v&&typeof v==="object").map(v=>({id:uid(),name:String(v.name??""),value:String(v.value??"")})),
+      snippets:(Array.isArray(w.snippets)?w.snippets:[]).filter(x=>x&&typeof x==="object").map(x=>({id:uid(),...(x.title?{title:String(x.title)}:{}),template:String(x.template??"")}))
+    }));
+  }
+  async function importFiles(files){
+    const imported=[];let failed=0;
+    for(const f of files){try{imported.push(...workspacesFromJson(await f.text()))}catch(_){failed++}}
+    if(imported.length){state.workspaces.push(...imported);state.activeId=imported[0].id;settingsOpen=false;render()}
+    const n=imported.length,msg=n?`Imported ${n} workspace${n===1?"":"s"}.`:"No workspaces found to import.";
+    toast(failed?`${msg} ${failed} file${failed===1?"":"s"} couldn't be read.`:msg);
+  }
+  function exportAll(){download("varpad-workspaces.json",JSON.stringify({workspaces:state.workspaces},null,2),"application/json");toast("All workspaces exported as JSON.")}
+  function exportJson(w){download(`${w.name.replace(/[^a-z0-9-_]+/gi,"-")||"workspace"}.json`,JSON.stringify(w,null,2),"application/json");toast("Workspace exported as JSON.")}
+  async function copyText(text,message="Rendered snippet copied."){
+    try{if(navigator.clipboard&&window.isSecureContext)await navigator.clipboard.writeText(text);else{const t=document.createElement("textarea");t.value=text;t.style.position="fixed";t.style.opacity="0";document.body.appendChild(t);t.select();if(!document.execCommand("copy"))throw Error();t.remove()}toast(message)}
+    catch(_){toast("Clipboard access was blocked by the browser.")}
+  }
+  function showTagline(){
+    const tagline=TAGLINES[Math.floor(Math.random()*TAGLINES.length)];
+    $("tagline").textContent=tagline;document.title=`VarPad — ${tagline}`;
+  }
+  $("addWorkspace").innerHTML=icon("plus");
+  $("workspacesMore").innerHTML=icon("ellipsis");
+  $("settingsButton").innerHTML=icon("settings");
+  $("settingsButton").addEventListener("click",()=>{document.activeElement?.blur();closeMenu();settingsOpen=!settingsOpen;render()});
+  $("zenButton").innerHTML='<span class="ico ico-enso" aria-hidden="true"></span>';
+  $("addWorkspace").addEventListener("click",addWorkspace);
+  let menuWorkspaceId=null;
+  function openMenu(btn){
+    const m=$("workspaceMenu"),r=btn.getBoundingClientRect();
+    menuWorkspaceId=btn.dataset.menuFor;
+    const item=(action,ico,label)=>`<button type="button" role="menuitem" data-action="${action}">${icon(ico)}${label}</button>`;
+    const [label,items]=menuWorkspaceId==="*"?["All workspaces actions",item("import","upload","Import")+item("export-all","braces","Export all")]
+      :menuWorkspaceId==="palettes"?["Palette actions",item("export-palettes","braces","Export all")]
+      :["Workspace actions",item("export-json","braces","Export")];
+    m.setAttribute("aria-label",label);m.innerHTML=items;
+    m.hidden=false;btn.setAttribute("aria-expanded","true");
+    m.style.top=`${r.bottom+4}px`;m.style.left=`${Math.max(8,Math.min(r.right-m.offsetWidth,innerWidth-m.offsetWidth-8))}px`;
+    m.querySelector("button").focus();
+  }
+  function closeMenu(){
+    if($("workspaceMenu").hidden)return;
+    $("workspaceMenu").hidden=true;menuWorkspaceId=null;
+    document.querySelectorAll('.workspace-more[aria-expanded="true"]').forEach(b=>b.setAttribute("aria-expanded","false"));
+  }
+  $("workspaceMenu").addEventListener("click",e=>{
+    const action=e.target.closest("[data-action]")?.dataset.action,w=state.workspaces.find(x=>x.id===menuWorkspaceId);
+    closeMenu();if(action==="export-palettes")exportAllPalettes();else if(action==="import")$("importFile").click();else if(action==="export-all")exportAll();else if(action==="export-json"&&w)exportJson(w);
+  });
+  document.addEventListener("click",e=>{if(!e.target.closest("#workspaceMenu,.workspace-more"))closeMenu()});
+  document.addEventListener("keydown",e=>{if(e.key==="Escape")closeMenu()});
+  window.addEventListener("resize",closeMenu);
+  window.addEventListener("resize",hideSuggest);
+  window.addEventListener("scroll",e=>{if(suggest&&e.target!==$("varSuggest"))updateSuggest(suggest.ta)},true);
+  $("varSuggest").addEventListener("mousedown",e=>e.preventDefault());
+  $("varSuggest").addEventListener("click",e=>{const o=e.target.closest("[data-i]");if(o&&suggest)chooseSuggest(Number(o.dataset.i))});
+  $("workspaceList").addEventListener("scroll",closeMenu);
+  // Clicking a snippet colour-codes it; clicking a variable keeps the current one so its values can be edited.
+  const activateFrom=e=>{
+    const sn=e.target.closest?.(".snippet");if(sn)setActiveSnippet(sn.dataset.snippetId);else if(!e.target.closest?.(".var-card"))setActiveSnippet(null);
+    const pr=$("promptSection");if(!pr||e.target.closest?.("#useCaseCard"))return;
+    const on=pr.contains(e.target);pr.classList.toggle("is-active",on);$("useCaseCard").classList.toggle("used",on);
+  };
+  document.addEventListener("pointerdown",activateFrom);
+  document.addEventListener("focusin",activateFrom);
+  $("paletteImportFile").addEventListener("change",e=>{const f=e.target.files[0];e.target.value="";if(f)importPaletteFile(f)});
+  $("importFile").addEventListener("change",e=>{const files=[...e.target.files];e.target.value="";if(files.length)importFiles(files)});
+  $("workspacesMore").addEventListener("click",e=>{const open=menuWorkspaceId==="*";closeMenu();if(!open)openMenu(e.currentTarget)});
+  $("workspaceList").addEventListener("click",e=>{
+    const del=e.target.closest("[data-delete-workspace]");
+    if(del){
+      const i=state.workspaces.findIndex(x=>x.id===del.dataset.deleteWorkspace);if(i<0)return;
+      const [gone]=state.workspaces.splice(i,1);closeMenu();
+      if(state.activeId===gone.id)state.activeId=(state.workspaces[i]||state.workspaces[i-1])?.id||null;
+      render();toast(`Workspace "${gone.name}" deleted.`);return;
+    }
+    const more=e.target.closest(".workspace-more");
+    if(more){const open=menuWorkspaceId===more.dataset.menuFor;closeMenu();if(!open)openMenu(more);return}
+    const setting=e.target.closest("[data-setting-id]");
+    if(setting){activeSetting=setting.dataset.settingId;render();return}
+    const b=e.target.closest("[data-workspace-id]");if(!b)return;
+    const w=state.workspaces.find(x=>x.id===b.dataset.workspaceId);if(!w)return;
+    state.activeId=w.id;render();
+  });
+  let zen=false;
+  function setZen(on){
+    zen=on;document.activeElement?.blur();closeMenu();
+    if(on&&settingsOpen){settingsOpen=false;render()}
+    if(!on)showTagline();
+    document.body.classList.toggle("zen",on);$("zenButton").setAttribute("aria-pressed",String(on));
+    try{localStorage.setItem("varpad-zen",on?"1":"0")}catch(_){}
+  }
+  $("zenButton").addEventListener("click",()=>setZen(!zen));
+  render();
+  let savedZen=false;
+  try{savedZen=localStorage.getItem("varpad-zen")==="1"}catch(_){}
+  setZen(savedZen);
+})();
+</script>
+</body>
+</html>
