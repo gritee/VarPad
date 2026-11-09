@@ -5,6 +5,70 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>VarPad — One tweak. Every snippet.</title>
 <style>
+  /* Splash: a fixed timeline with no JS and no events, first in the document so it paints before anything else.
+     Every animated element is an HTML element animating only transform or opacity, so the browser runs it off the main thread:
+     it plays out on schedule however busy the page's own loading is.
+     The character animates on twos: 12 drawings a second, each keyframe on a 1/12 s boundary held by step-end. The wipe is smooth. */
+  #splash{position:fixed;inset:0;z-index:2147483647;overflow:hidden;animation:sp-gone 1.45s step-end both}
+  #splash .half{position:absolute;inset:0;will-change:transform}
+  #splash .tri{position:absolute;inset:0;background:#fff}
+  /* The cut runs between the golden-section points of the top and bottom edges: 61.8% across the top, 38.2% across the bottom. */
+  #splash .a .tri{clip-path:polygon(0 0,calc(61.8% + 1px) 0,calc(38.2% + 1px) 100%,0 100%)}
+  #splash .b .tri{clip-path:polygon(61.8% 0,100% 0,100% 100%,38.2% 100%)}
+  #splash .a{animation:sp-part-a .5s .933s cubic-bezier(.5,0,.75,0) both}
+  #splash .b{animation:sp-part-b .5s .933s cubic-bezier(.5,0,.75,0) both}
+  #splash .edge{position:absolute;left:50%;top:50%;width:hypot(23.6vw,100vh);height:1.5px;background:#202631;translate:-50% -50%;rotate:calc(-1*atan2(100vh,23.6vw));opacity:0;animation:sp-show .933s step-end forwards}
+  #splash svg{display:block;width:100%;height:100%;overflow:visible;fill:none;stroke:#202631;stroke-width:3;stroke-linecap:round;stroke-linejoin:round}
+  #splash .fill{fill:#fff}
+  #splash .dot{fill:#202631;stroke:none}
+  #splash .stage{position:absolute;left:50%;top:58%;width:120px;height:160px;margin:-80px 0 0 -60px;transform:scale(1.3);animation:sp-fade .2s 1s ease-in both}
+  #splash .hop,#splash .pose,#splash .fx > div,#splash .bo-spin{position:absolute;will-change:transform,opacity}
+  #splash .hop,#splash .pose,#splash .fx > div{inset:0}
+  #splash .hop{transform-origin:50% 90%;animation:sp-hop 1s .1s step-end both}
+  #splash .bo{stroke-width:3.5}
+  #splash .bo-spin{left:5px;top:6px;width:110px;height:8px;animation:sp-bo 1s .1s step-end both}
+  #splash .ready{animation:sp-ready 1s .1s step-end both}
+  #splash .overhead{animation:sp-overhead 1s .1s step-end both}
+  #splash .thrust{animation:sp-thrust 1s .1s step-end both}
+  #splash .sweep{animation:sp-sweep 1s .1s step-end both}
+  #splash .finish{animation:sp-finish 1s .1s step-end both}
+  #splash .whirl1{animation:sp-whirl1 1s .1s step-end both}
+  #splash .whirl2{animation:sp-whirl2 1s .1s step-end both}
+  #splash .whirl3{animation:sp-whirl3 1s .1s step-end both}
+  #splash .speed{animation:sp-speed 1s .1s step-end both}
+  #splash .impact{animation:sp-impact 1s .1s step-end both}
+  #splash .swoosh{animation:sp-swoosh 1s .1s step-end both}
+  #splash .kick{animation:sp-kick 1s .1s step-end both}
+  #splash .shine{animation:sp-shine 1s .1s step-end both}
+  @keyframes sp-hop{0%{transform:none}8.333%{transform:translateY(2px) scale(1.04,.95)}16.667%{transform:translateY(-4px) scale(.97,1.04)}25%{transform:none}50%{transform:translateX(4px)}58.333%{transform:translateX(6px)}66.667%{transform:translateX(2px)}75%{transform:none}83.333%{transform:scale(1.02,.98)}91.667%{transform:none}100%{transform:none}}
+  @keyframes sp-bo{0%{transform:rotate(0deg);opacity:0}16.667%{transform:rotate(0deg);opacity:1}25%{transform:rotate(70deg);opacity:1}33.333%{transform:rotate(140deg);opacity:1}41.667%{transform:rotate(210deg);opacity:1}50%,100%{transform:rotate(210deg);opacity:0}}
+  @keyframes sp-ready{0%{opacity:1}16.667%{opacity:0}100%{opacity:0}}
+  @keyframes sp-overhead{0%{opacity:0}16.667%{opacity:1}50%{opacity:0}100%{opacity:0}}
+  @keyframes sp-thrust{0%{opacity:0}50%{opacity:1}66.667%{opacity:0}100%{opacity:0}}
+  @keyframes sp-sweep{0%{opacity:0}66.667%{opacity:1}83.333%{opacity:0}100%{opacity:0}}
+  @keyframes sp-finish{0%{opacity:0}83.333%{opacity:1}100%{opacity:1}}
+  @keyframes sp-whirl1{0%{opacity:0}25%{opacity:0.45}41.667%{opacity:0}100%{opacity:0}}
+  @keyframes sp-whirl2{0%{opacity:0}33.333%{opacity:0.45}50%{opacity:0}100%{opacity:0}}
+  @keyframes sp-whirl3{0%{opacity:0}41.667%{opacity:0.45}50%{opacity:0}100%{opacity:0}}
+  @keyframes sp-speed{0%{opacity:0}50%{opacity:0.45}66.667%{opacity:0}100%{opacity:0}}
+  @keyframes sp-impact{0%{opacity:0}58.333%{opacity:1}66.667%{opacity:0}100%{opacity:0}}
+  @keyframes sp-swoosh{0%{opacity:0}66.667%{opacity:0.45}83.333%{opacity:0}100%{opacity:0}}
+  @keyframes sp-kick{0%{opacity:0}75%{opacity:1}83.333%{opacity:0}100%{opacity:0}}
+  @keyframes sp-shine{0%{opacity:0}83.333%{opacity:1}100%{opacity:0}}
+  #splash .fx{position:absolute;left:-40px;top:-110px;width:200px;height:280px}
+  #splash .fx svg{stroke-width:2}
+  @keyframes sp-part-a{to{transform:translateX(-61.8%)}}
+  @keyframes sp-part-b{to{transform:translateX(61.8%)}}
+  @keyframes sp-show{to{opacity:1}}
+  @keyframes sp-gone{to{visibility:hidden}}
+  @keyframes sp-fade{to{opacity:0}}
+  @media (prefers-reduced-motion:reduce){
+    #splash{animation-duration:.5s}
+    #splash .stage,#splash .edge{display:none}
+    #splash .half{animation:sp-fade .2s .3s both}
+  }
+</style>
+<style>
   /* Colour palettes. Each sets every token, so palette previews can scope one with data-palette. */
   :root,[data-palette="day"]{
     color-scheme:light;
@@ -195,6 +259,29 @@
 </style>
 </head>
 <body>
+<div id="splash" aria-hidden="true">
+  <div class="half a"><i class="tri"></i><i class="edge"></i></div><div class="half b"><i class="tri"></i><i class="edge"></i></div>
+  <div class="stage">
+    <div class="hop">
+      <div class="pose ready"><svg viewBox="0 0 120 160"><path d="M50 61 L44 76 L42 90"/><path class="fill" d="M47.5 87.8 L47.8 115.8 L48 139.8 L56 140.2 L58.2 116.2 L60.5 88.2 Z"/><path class="fill" d="M46 144 Q47 138 55 139 L62 144 Z"/><path class="fill" d="M59.5 88.2 L61.8 116.2 L64 140.2 L72 139.8 L72.2 115.8 L72.5 87.8 Z"/><path class="fill" d="M62 144 Q63 138 71 139 L78 144 Z"/><g transform="translate(60 56) rotate(0)"><path class="fill" d="M-13 0 L13 0 L16 34 L-16 34 Z"/><path d="M-7 0 L1 13 L7 0 M-16 28 L16 28 M2 28 l-3 8 M2 28 l4 7"/></g><g transform="translate(60 41)"><path d="M-14 -8 q-10 -5 -19 1 M-15 -3 q-9 3 -13 12"/><circle class="fill" cx="-15" cy="-6" r="2.5"/><circle class="fill" cx="0" cy="0" r="17"/><path class="fill" d="M-16 -6 Q1 -10 17 -5 L17 4 Q1 1 -16 4 Z"/><path d="M0 -2 l5 2 M15 -2 l-5 2"/></g><path d="M70 61 L80 74 L85 86"/><path class="bo" d="M85 14 L85 146"/><circle class="fill" cx="42" cy="90" r="3.3"/><circle class="fill" cx="85" cy="86" r="3.3"/></svg></div>
+      <div class="pose overhead"><svg viewBox="0 0 120 160"><path d="M50 61 L42 36 L53 10"/><path class="fill" d="M47.8 86.2 L40.9 113.6 L36.1 139.1 L43.9 140.9 L51.1 116.4 L60.2 89.8 Z"/><path class="fill" d="M34 144 Q35 138 43 139 L50 144 Z"/><path class="fill" d="M59.8 89.8 L68.9 116.4 L76.1 140.9 L83.9 139.1 L79.1 113.6 L72.2 86.2 Z"/><path class="fill" d="M74 144 Q75 138 83 139 L90 144 Z"/><g transform="translate(60 56) rotate(0)"><path class="fill" d="M-13 0 L13 0 L16 34 L-16 34 Z"/><path d="M-7 0 L1 13 L7 0 M-16 28 L16 28 M2 28 l-3 8 M2 28 l4 7"/></g><g transform="translate(60 41)"><path d="M-14 -8 q-10 -5 -19 1 M-15 -3 q-9 3 -13 12"/><circle class="fill" cx="-15" cy="-6" r="2.5"/><circle class="fill" cx="0" cy="0" r="17"/><path class="fill" d="M-16 -6 Q1 -10 17 -5 L17 4 Q1 1 -16 4 Z"/><path d="M0 -2 l5 2 M15 -2 l-5 2"/></g><path d="M70 61 L78 36 L67 10"/><circle class="fill" cx="53" cy="10" r="3.3"/><circle class="fill" cx="67" cy="10" r="3.3"/></svg></div>
+      <div class="pose thrust"><svg viewBox="0 0 120 160"><path class="fill" d="M47.8 92.9 L35.7 116.9 L19 137.3 L25 142.7 L44.3 123.1 L59.1 99.2 Z"/><path class="fill" d="M16 144 Q17 138 25 139 L32 144 Z"/><path class="fill" d="M61.4 103.8 L79.3 114.4 L82 140.3 L90 139.7 L88.7 109.6 L69 93.3 Z"/><path class="fill" d="M80 144 Q81 138 89 139 L96 144 Z"/><g transform="translate(66 66) rotate(12)"><path class="fill" d="M-13 0 L13 0 L16 34 L-16 34 Z"/><path d="M-7 0 L1 13 L7 0 M-16 28 L16 28 M2 28 l-3 8 M2 28 l4 7"/></g><g transform="translate(69.1 51.3)"><path d="M-14 -8 q-10 -5 -19 1 M-15 -3 q-9 3 -13 12"/><circle class="fill" cx="-15" cy="-6" r="2.5"/><circle class="fill" cx="0" cy="0" r="17"/><path class="fill" d="M-16 -6 Q1 -10 17 -5 L17 4 Q1 1 -16 4 Z"/><path d="M0 -2 l5 2 M15 -2 l-5 2"/></g><path d="M74.7 73 L70 84 L76 70.6"/><path class="bo" d="M18 58 L124 81"/><path d="M55.2 68.8 L80 86 L98 75.4"/><circle class="fill" cx="98" cy="75.4" r="3.3"/><circle class="fill" cx="76" cy="70.6" r="3.3"/></svg></div>
+      <div class="pose sweep"><svg viewBox="0 0 120 160"><path d="M45.7 92.3 L40 110 L44 128.2"/><path class="fill" d="M43.7 114.4 L29.4 127.4 L10.5 136.3 L13.5 143.7 L34.6 136.6 L51.8 124.6 Z"/><path class="fill" d="M6 144 Q7 138 15 139 L22 144 Z"/><path class="fill" d="M62.3 126.3 L80.3 113.8 L76 139.5 L84 140.5 L87.7 106.2 L57.2 114.4 Z"/><path class="fill" d="M74 144 Q75 138 83 139 L90 144 Z"/><g transform="translate(56 88) rotate(4)"><path class="fill" d="M-13 0 L13 0 L16 34 L-16 34 Z"/><path d="M-7 0 L1 13 L7 0 M-16 28 L16 28 M2 28 l-3 8 M2 28 l4 7"/></g><g transform="translate(57 73)"><path d="M-14 -8 q-10 -5 -19 1 M-15 -3 q-9 3 -13 12"/><circle class="fill" cx="-15" cy="-6" r="2.5"/><circle class="fill" cx="0" cy="0" r="17"/><path class="fill" d="M-16 -6 Q1 -10 17 -5 L17 4 Q1 1 -16 4 Z"/><path d="M0 -2 l5 2 M15 -2 l-5 2"/></g><path d="M65.6 93.7 L74 110 L74 126.6"/><path class="bo" d="M-6 131 L120 124"/><circle class="fill" cx="44" cy="128.2" r="3.3"/><circle class="fill" cx="74" cy="126.6" r="3.3"/></svg></div>
+      <div class="pose finish"><svg viewBox="0 0 120 160"><path class="bo" d="M14 28 L104 132"/><path d="M50 61 L42 70 L36 53.4"/><path class="fill" d="M47.6 87.1 L44.8 115 L40.1 139 L47.9 141 L55.2 117 L60.4 88.9 Z"/><path class="fill" d="M38 144 Q39 138 47 139 L54 144 Z"/><path class="fill" d="M59.6 89.4 L66.9 117.2 L74.1 141 L81.9 139 L77.1 114.8 L72.4 86.6 Z"/><path class="fill" d="M72 144 Q73 138 81 139 L88 144 Z"/><g transform="translate(60 56) rotate(0)"><path class="fill" d="M-13 0 L13 0 L16 34 L-16 34 Z"/><path d="M-7 0 L1 13 L7 0 M-16 28 L16 28 M2 28 l-3 8 M2 28 l4 7"/></g><g transform="translate(60 41)"><path d="M-14 -8 q-10 -5 -19 1 M-15 -3 q-9 3 -13 12"/><circle class="fill" cx="-15" cy="-6" r="2.5"/><circle class="fill" cx="0" cy="0" r="17"/><path class="fill" d="M-16 -6 Q1 -10 17 -5 L17 4 Q1 1 -16 4 Z"/><path d="M0 -2 l5 2 M15 -2 l-5 2"/></g><path d="M70 61 L84 60 L99 57"/><circle class="fill" cx="36" cy="53.4" r="3.3"/><circle class="fill" cx="99" cy="57" r="3.3"/></svg></div>
+      <div class="bo-spin"><svg viewBox="0 0 110 8"><path class="bo" d="M2 4 L108 4"/></svg></div>
+      <div class="fx">
+      <div class="whirl1"><svg viewBox="-40 -110 200 280"><path d="M3.6 -10.5 A60 60 0 0 1 39.5 -46.4 M116.4 30.5 A60 60 0 0 1 80.5 66.4"/></svg></div>
+      <div class="whirl2"><svg viewBox="-40 -110 200 280"><path d="M60 -50 A60 60 0 0 1 106 -28.6 M60 70 A60 60 0 0 1 14 48.6"/></svg></div>
+      <div class="whirl3"><svg viewBox="-40 -110 200 280"><path d="M116.4 -10.5 A60 60 0 0 1 112 40 M3.6 30.5 A60 60 0 0 1 8 -20"/></svg></div>
+      <div class="speed"><svg viewBox="-40 -110 200 280"><path d="M8 52 h-18 M6 62 h-24 M10 70 h-14"/></svg></div>
+      <div class="impact"><svg viewBox="-40 -110 200 280"><path d="M128 72 l6 -6 M131 81 h9 M128 90 l6 6"/></svg></div>
+      <div class="swoosh"><svg viewBox="-40 -110 200 280"><path d="M-10 147 Q50 156 122 147"/></svg></div>
+      <div class="kick"><svg viewBox="-40 -110 200 280"><path d="M88 146 l12 -3 M86 140 l10 -8"/></svg></div>
+      <div class="shine"><svg viewBox="-40 -110 200 280"><path d="M14 14 v-7 M14 42 v7 M0 28 h-7 M28 28 h7"/></svg></div>
+      </div>
+    </div>
+  </div>
+</div>
 <header class="app-header">
   <div class="brand">
     <h1>VarPad</h1>
@@ -224,7 +311,7 @@
 <div id="toast" class="toast" role="status" aria-live="polite"></div>
 
 <script>
-(() => {
+const boot = () => {
   const STORAGE_KEY = "varpad-workspaces-v2";
   const TAGLINES = [
     "One tweak. Every snippet.",
@@ -900,7 +987,9 @@ Generate me a workspace import for {{Your_VarPad_use_case}}`;
   let savedZen=false;
   try{savedZen=localStorage.getItem("varpad-zen")==="1"}catch(_){}
   setZen(savedZen);
-})();
+};
+// Let the splash paint first; the app builds itself behind it.
+requestAnimationFrame(() => setTimeout(boot));
 </script>
 </body>
 </html>
